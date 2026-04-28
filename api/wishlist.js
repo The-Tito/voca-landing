@@ -1,15 +1,29 @@
 const { createClient } = require('@supabase/supabase-js');
-const brevo = require('@getbrevo/brevo');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
+const BREVO_API = 'https://api.brevo.com/v3';
+
+async function brevoRequest(path, body) {
+  const res = await fetch(`${BREVO_API}${path}`, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  return res;
+}
+
 module.exports = async (req, res) => {
   // CORS
   const origin = req.headers.origin;
-  const allowed = ['https://voca.com.mx', 'http://localhost:3000'];
+  const allowed = ['https://voca.com.mx', 'https://www.voca.com.mx', 'http://localhost:3000'];
   if (allowed.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
@@ -17,24 +31,21 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   const { email } = req.body || {};
 
-  // Validación de email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   if (!email || !emailRegex.test(email.trim())) {
     return res.status(400).json({ error: 'Email inválido' });
   }
 
   const normalizedEmail = email.toLowerCase().trim();
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || '';
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || '';
   const userAgent = req.headers['user-agent'] || '';
 
   try {
-    // Verificar si el email ya existe
+    // Verificar si ya existe
     const { data: existing } = await supabase
       .from('wishlist')
       .select('id')
@@ -42,39 +53,27 @@ module.exports = async (req, res) => {
       .maybeSingle();
 
     if (!existing) {
-      // Insertar nuevo registro
+      // Insertar en Supabase
       const { error: insertError } = await supabase
         .from('wishlist')
-        .insert({
-          email: normalizedEmail,
-          ip_address: ip,
-          user_agent: userAgent,
-        });
+        .insert({ email: normalizedEmail, ip_address: ip, user_agent: userAgent });
 
       if (insertError) throw insertError;
 
-      // Añadir a lista VOCA-Wishlist (todos los registros)
-      const contactsApi = new brevo.ContactsApi();
-      contactsApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-
-      await contactsApi.createContact({
+      // Añadir a lista VOCA-Early-Access en Brevo
+      await brevoRequest('/contacts', {
         email: normalizedEmail,
         listIds: [parseInt(process.env.BREVO_WISHLIST_LIST_ID)],
         updateEnabled: true,
       });
 
-      // Enviar email de confirmación de wishlist (a todos)
-      const emailApi = new brevo.TransactionalEmailsApi();
-      emailApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-
-      await emailApi.sendTransacEmail({
+      // Enviar email de confirmación
+      await brevoRequest('/smtp/email', {
         to: [{ email: normalizedEmail }],
         templateId: parseInt(process.env.BREVO_WISHLIST_TEMPLATE_ID),
       });
     }
 
-    // Si el email ya existe, respondemos success sin error
-    // (el usuario ya está en la lista, no hay que bloquearlo)
     return res.status(200).json({ success: true });
 
   } catch (error) {
