@@ -1,0 +1,12 @@
+{
+  "name": "voca-landing",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "@getbrevo/brevo": "^2.0.0",
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
