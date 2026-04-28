@@ -46,10 +46,10 @@ module.exports = async (req, res) => {
       const contactsApi = new brevo.ContactsApi();
       contactsApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
 
-      // Añadir contacto a la lista (updateEnabled maneja duplicados)
+      // Añadir a lista VOCA-Newsletter (solo suscriptores)
       await contactsApi.createContact({
         email: normalizedEmail,
-        listIds: [parseInt(process.env.BREVO_LIST_ID)],
+        listIds: [parseInt(process.env.BREVO_NEWSLETTER_LIST_ID)],
         updateEnabled: true,
       });
 

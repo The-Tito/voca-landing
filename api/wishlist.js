@@ -53,6 +53,16 @@ module.exports = async (req, res) => {
 
       if (insertError) throw insertError;
 
+      // Añadir a lista VOCA-Wishlist (todos los registros)
+      const contactsApi = new brevo.ContactsApi();
+      contactsApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+
+      await contactsApi.createContact({
+        email: normalizedEmail,
+        listIds: [parseInt(process.env.BREVO_WISHLIST_LIST_ID)],
+        updateEnabled: true,
+      });
+
       // Enviar email de confirmación de wishlist (a todos)
       const emailApi = new brevo.TransactionalEmailsApi();
       emailApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
