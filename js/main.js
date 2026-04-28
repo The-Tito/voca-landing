@@ -53,19 +53,22 @@ async function confirmNewsletter() {
   const btn = document.querySelector('.nl-btn-yes');
   setLoading(btn, true);
 
+  // Capturamos y limpiamos pendingEmail ANTES de cerrar el modal
+  // para que closeNewsletterModal no dispare un accept: false
+  const emailToSend = pendingEmail;
+  pendingEmail = '';
+
   try {
     const res = await fetch('/api/newsletter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: pendingEmail, accept: true }),
+      body: JSON.stringify({ email: emailToSend, accept: true }),
     });
 
     const data = await res.json();
-
-    closeNewsletterModal();
+    _closeModalUI();
 
     if (!res.ok) {
-      // Error silencioso: el usuario ya está en la wishlist, no bloqueamos
       console.error('[newsletter]', data.error);
       return;
     }
@@ -74,31 +77,34 @@ async function confirmNewsletter() {
 
   } catch (err) {
     console.error(err);
-    closeNewsletterModal();
+    _closeModalUI();
   } finally {
     setLoading(btn, false);
-    pendingEmail = '';
   }
 }
 
-// ── Rechazar newsletter ───────────────────────────────────────
-async function closeNewsletterModal() {
+// ── Rechazar newsletter / cerrar modal ────────────────────────
+function _closeModalUI() {
   document.getElementById('nl-overlay').classList.remove('open');
   document.getElementById('nl-modal').classList.remove('open');
+}
 
-  // Si hay email pendiente y el usuario cerró sin aceptar,
-  // registramos el rechazo silenciosamente
+async function closeNewsletterModal() {
+  _closeModalUI();
+
+  // Solo registra el rechazo si el usuario cerró sin aceptar
   if (pendingEmail) {
+    const email = pendingEmail;
+    pendingEmail = '';
     try {
       await fetch('/api/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pendingEmail, accept: false }),
+        body: JSON.stringify({ email, accept: false }),
       });
     } catch (_) {
-      // Fallo silencioso — no afecta la experiencia del usuario
+      // Fallo silencioso
     }
-    pendingEmail = '';
   }
 }
 
