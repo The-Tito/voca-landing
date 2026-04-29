@@ -66,6 +66,7 @@ module.exports = async (req, res) => {
       await brevoRequest('/smtp/email', {
         to: [{ email: normalizedEmail }],
         templateId: parseInt(process.env.BREVO_NEWSLETTER_TEMPLATE_ID),
+        replyTo: { email: 'selvas.leon029@gmail.com', name: 'Antonio Silva' },
       });
     }
 
